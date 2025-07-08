@@ -33,7 +33,7 @@ jobs:
         run: |
           cp -R ./src/.next/standalone ./deploy
           cp -R ./src/.next/static ./deploy/.next/static
-          cp -R .src/public ./deploy/public
+          cp -R ./src/public ./deploy/public
 
       - name: 📦 Upload build artifact
         if: github.event_name != 'pull_request'
