@@ -29,11 +29,14 @@ jobs:
         working-directory: ./src
         run: npm run build --if-present
 
-      - name: 📦 Generate deployment artifacts
-        run: |
-          cp -R ./src/.next/standalone ./deploy
-          cp -R ./src/.next/static ./deploy/.next/static
-          cp -R ./src/public ./deploy/public
+      - name: 📂 Copy standalone into the root
+        run: cp -R ./src/.next/standalone ./deploy
+
+      - name: 📂 Copy static into the .next folder
+        run: cp -R ./src/.next/static ./deploy/.next/static
+
+      - name: 📂 Copy Public folder
+        run: cp -R ./src/public ./deploy/public
 
       - name: 📦 Upload build artifact
         if: github.event_name != 'pull_request'
