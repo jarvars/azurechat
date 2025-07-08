@@ -21,13 +21,12 @@ jobs:
           cache: 'npm'
           cache-dependency-path: ./src/package-lock.json
 
-      - name: ⚙️ Install dependencies
-        working-directory: ./src
-        run: npm ci
-
-      - name: ⚙️ Build application
-        working-directory: ./src
-        run: npm run build --if-present
+      - name: ⚙️ npm install & build
+        run: |
+          cd ./src
+          npm install
+          npm run build --if-present
+          cd..
 
       - name: 📂 Copy standalone into the root
         run: cp -R ./src/.next/standalone ./deploy
@@ -45,3 +44,4 @@ jobs:
           name: qana-app-${{ github.ref_name }}-${{ github.sha }}
           path: ./deploy
           retention-days: 30
+          include-hidden-files: true
