@@ -1,0 +1,47 @@
+name: 🚧 CI qAna
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 🌱 Checkout to the branch
+        uses: actions/checkout@v4
+
+      - name: 🍏 Set up Node.js version
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: 'npm'
+          cache-dependency-path: ./src/package-lock.json
+
+      - name: ⚙️ Install dependencies
+        working-directory: ./src
+        run: npm ci
+
+      - name: ⚙️ Build application
+        working-directory: ./src
+        run: npm run build --if-present
+
+      - name: 🔍 Lint code
+        run: npm run lint --if-present
+
+      - name: 📦 Generate deployment artifacts
+        run: |
+          cp -R ./src/.next/standalone ./deploy
+          cp -R ./src/.next/static ./deploy/.next/static
+          cp -R .src/public ./deploy/public
+
+      - name: 📦 Upload build artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: qana-app-${{ github.ref_name }}-${{ github.sha }}
+          path: ./deploy
+          retention-days: 30
