@@ -1,4 +1,4 @@
-name: CI qAna
+name: CI-qAna
 
 on:
   push:
