@@ -1,0 +1,45 @@
+name: CD-qAna
+
+on:
+  workflow_run:
+    workflows: ["CI-qAna"]
+    types:
+      - completed
+  
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' && (startsWith(github.event.workflow_run.head_branch, 'v') || github.event.workflow_run.head_branch == 'main') }}
+    environment: ${{ startsWith(github.ref, 'refs/tags/') && 'prd' || 'dev' }}
+
+    steps:
+      - name: 📦 Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: qana-app-${{ github.ref_name }}-${{ github.sha }}
+          path: qana-app
+
+      - name: Azure Login Service Principal
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Web app config
+        uses: azure/CLI@v2.1.0
+        with:
+          inlineScript: |
+            echo Setting SCM_DO_BUILD_DURING_DEPLOYMENT=false on app service
+            az webapp config appsettings set -n ${{ secrets.AZURE_WEBAPP_NAME }} -g ${{ secrets.AZURE_RESOURCE_GROUP }} --settings SCM_DO_BUILD_DURING_DEPLOYMENT=false -o none
+            echo Setting --startup-file=\"node server.js\" on app service
+            az webapp config set --startup-file="node server.js" -n ${{ secrets.AZURE_WEBAPP_NAME }} -g ${{ secrets.AZURE_RESOURCE_GROUP }} -o none
+            sleep 10
+
+      - name: 🚀 Deploy to Azure Web App
+        id: deploy-to-webapp
+        uses: azure/webapps-deploy@v3.0.1
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          package: ${{ github.workspace }}/app.zip
+
+      - name: 🧹 Cleanup
+        run: rm ${{ github.workspace }}/app.zip
