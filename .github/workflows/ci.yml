@@ -1,4 +1,4 @@
-name: 🚧 CI qAna
+name: CI qAna
 
 on:
   push:
@@ -28,20 +28,18 @@ jobs:
           npm run build --if-present
           cd ..
 
-      - name: 📂 Copy standalone into the root
-        run: cp -R ./src/.next/standalone ./deploy
-
-      - name: 📂 Copy static into the .next folder
-        run: cp -R ./src/.next/static ./deploy/.next/static
-
-      - name: 📂 Copy Public folder
-        run: cp -R ./src/public ./deploy/public
+      - name: 📂 Generate artifact
+        run: |
+          cp -R ./src/.next/standalone ./deploy
+          cp -R ./src/.next/static ./deploy/.next/static
+          cp -R ./src/public ./deploy/public
+          cd ./deploy
+          zip app.zip ./* .next -qr
 
       - name: 📦 Upload build artifact
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: qana-app-${{ github.ref_name }}-${{ github.sha }}
-          path: ./deploy
+          path: ./deploy/app.zip
           retention-days: 30
-          include-hidden-files: true
