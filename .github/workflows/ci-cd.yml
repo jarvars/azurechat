@@ -1,0 +1,87 @@
+name: CI/CD qAna
+
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - 'v*.*.*'
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      SHOULD_PACKAGE: ${{ github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/tags/')) }}
+
+    steps:
+      - name: 🌱 Checkout to the branch
+        uses: actions/checkout@v4
+
+      - name: 🍏 Set up Node.js version
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: 'npm'
+          cache-dependency-path: ./src/package-lock.json
+
+      - name: ⚙️ npm install & build
+        run: |
+          cd ./src
+          npm install
+          npm run build --if-present
+          cd ..
+
+      - name: 📂 Generate artifact
+        if: env.SHOULD_PACKAGE == 'true'
+        run: |
+          cp -R ./src/.next/standalone ./deploy
+          cp -R ./src/.next/static ./deploy/.next/static
+          cp -R ./src/public ./deploy/public
+          cd ./deploy
+          zip app.zip ./* .next -qr
+
+      - name: 📦 Upload build artifact
+        if: env.SHOULD_PACKAGE == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: qana-app-${{ github.ref_name }}-${{ github.sha }}
+          path: ./deploy/app.zip
+          retention-days: 30
+
+  deploy:
+    needs: build
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+    runs-on: ubuntu-latest
+    environment: ${{ startsWith(github.ref, 'refs/tags/') && 'prd' || 'dev' }}
+    
+    steps:
+      - name: 📦 Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: qana-app-${{ github.ref_name }}-${{ github.sha }}
+
+      - name: Azure Login Service Principal
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Web app config
+        uses: azure/CLI@v2.1.0
+        with:
+          inlineScript: |
+            echo Setting SCM_DO_BUILD_DURING_DEPLOYMENT=false on app service
+            az webapp config appsettings set -n ${{ secrets.AZURE_WEBAPP_NAME }} -g ${{ secrets.AZURE_RESOURCE_GROUP }} --settings SCM_DO_BUILD_DURING_DEPLOYMENT=false -o none
+            echo Setting --startup-file=\"node server.js\" on app service
+            az webapp config set --startup-file="node server.js" -n ${{ secrets.AZURE_WEBAPP_NAME }} -g ${{ secrets.AZURE_RESOURCE_GROUP }} -o none
+            sleep 10
+
+      - name: 🚀 Deploy to Azure Web App
+        id: deploy-to-webapp
+        uses: azure/webapps-deploy@v3.0.1
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          package: ${{ github.workspace }}/qana-app-${{ github.ref_name }}-${{ github.sha }}.zip
+
+      - name: 🧹 Cleanup
+        run: rm ${{ github.workspace }}/qana-app-${{ github.ref_name }}-${{ github.sha }}.zip
