@@ -17,6 +17,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: qana-app-${{ github.ref_name }}-${{ github.sha }}
+          github-token: ${{ secrets.ARTIFACT_DOWNLOAD_TOKEN }}
           path: qana-app
 
       - name: Azure Login Service Principal
